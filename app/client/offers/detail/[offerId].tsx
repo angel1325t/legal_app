@@ -1,4 +1,5 @@
 // CLIENT APP - app/client/offers/detail/[offerId].tsx
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,16 +12,14 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import offersService, { OfferDetail, CaseLawyer } from '../../../../services/offerService';
+import offersService, { OfferDetail } from '../../../../services/offerService';
 
 export default function OfferDetailScreen() {
   const router = useRouter();
   const { offerId } = useLocalSearchParams();
   
   const [offer, setOffer] = useState<OfferDetail | null>(null);
-  const [lawyer, setLawyer] = useState<CaseLawyer | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingLawyer, setLoadingLawyer] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,10 +53,7 @@ export default function OfferDetailScreen() {
       'Aceptar Oferta',
       '¿Estás seguro de que deseas aceptar esta oferta? Las demás ofertas serán rechazadas automáticamente.',
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Aceptar',
           style: 'default',
@@ -72,14 +68,7 @@ export default function OfferDetailScreen() {
                 Alert.alert(
                   'Éxito',
                   response.message || 'Oferta aceptada exitosamente',
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => {
-                        router.back();
-                      },
-                    },
-                  ]
+                  [{ text: 'OK', onPress: () => router.back() }]
                 );
               } else {
                 Alert.alert('Error', response.error || 'No se pudo aceptar la oferta');
@@ -94,66 +83,38 @@ export default function OfferDetailScreen() {
     );
   };
 
-  const getStateColor = (state: string) => {
+  const getStateConfig = (state: string) => {
     switch (state) {
       case 'accepted':
-        return 'bg-green-500';
+        return {
+          color: '#059669',
+          bgColor: '#ECFDF5',
+          icon: 'checkmark-circle' as const,
+          text: 'Aceptada',
+        };
       case 'rejected':
-        return 'bg-red-500';
+        return {
+          color: '#DC2626',
+          bgColor: '#FEF2F2',
+          icon: 'close-circle' as const,
+          text: 'Rechazada',
+        };
       default:
-        return 'bg-yellow-500';
+        return {
+          color: '#F59E0B',
+          bgColor: '#FFFBEB',
+          icon: 'time' as const,
+          text: 'Pendiente',
+        };
     }
   };
-
-  const getStateText = (state: string) => {
-    switch (state) {
-      case 'accepted':
-        return 'Aceptada';
-      case 'rejected':
-        return 'Rechazada';
-      default:
-        return 'Pendiente';
-    }
-  };
-
-  const renderLawyerInfo = () => {
-  if (offer?.state !== 'accepted') {
-    return (
-      <View className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
-        <Text className="text-sm text-yellow-800">
-          Acepta la oferta para ver el perfil del abogado
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <TouchableOpacity
-      className="flex-row items-center justify-center p-4 bg-indigo-600 rounded-lg"
-      onPress={() =>
-        router.push({
-          pathname: '/client/lawyers/[caseId]',
-          params: { 
-            caseId: offer.case_id
-          },
-        })
-      }
-    >
-      <Ionicons name="person-outline" size={20} color="white" />
-      <Text className="ml-2 font-semibold text-white">
-        Ver Perfil del Abogado
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
 
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50">
         <View className="items-center justify-center flex-1">
           <ActivityIndicator size="large" color="#4F46E5" />
-          <Text className="mt-4 text-gray-600">Cargando detalle...</Text>
+          <Text className="mt-4 text-sm text-gray-600">Cargando oferta...</Text>
         </View>
       </SafeAreaView>
     );
@@ -163,120 +124,190 @@ export default function OfferDetailScreen() {
     return (
       <SafeAreaView className="flex-1 bg-gray-50">
         <View className="items-center justify-center flex-1 px-6">
-          <Ionicons name="alert-circle" size={64} color="#EF4444" />
-          <Text className="mt-4 text-xl font-semibold text-gray-900">
-            Error
-          </Text>
-          <Text className="mt-2 text-center text-gray-600">
-            {error || 'No se pudo cargar la oferta'}
-          </Text>
-          <TouchableOpacity
-            className="px-6 py-3 mt-6 bg-indigo-600 rounded-lg"
-            onPress={() => router.back()}
-          >
-            <Text className="font-semibold text-white">Volver</Text>
-          </TouchableOpacity>
+          <View className="items-center w-full p-8 bg-white rounded-2xl">
+            <View className="items-center justify-center w-16 h-16 bg-red-50 rounded-xl">
+              <Ionicons name="alert-circle" size={32} color="#DC2626" />
+            </View>
+            <Text className="mt-4 text-lg font-bold text-gray-900">
+              {error || 'Oferta no encontrada'}
+            </Text>
+            <TouchableOpacity
+              className="px-6 py-3 mt-6 bg-gray-900 rounded-xl"
+              onPress={() => router.back()}
+              activeOpacity={0.8}
+            >
+              <Text className="text-sm font-semibold text-white">Volver</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
+  const stateConfig = getStateConfig(offer.state);
+
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="p-2 -ml-2"
-        >
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-900">
-          Detalle de Oferta
-        </Text>
-        <View className="w-8" />
+      <View className="bg-white border-b border-gray-100">
+        <View className="flex-row items-center justify-between px-6 py-4">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="items-center justify-center w-10 h-10 bg-gray-100 rounded-xl"
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color="#111827" />
+          </TouchableOpacity>
+          <Text className="text-xl font-bold text-gray-900">
+            Detalle de Oferta
+          </Text>
+          <View className="w-10" />
+        </View>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24 }}>
+      <ScrollView 
+        className="flex-1" 
+        contentContainerStyle={{ padding: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Status Badge */}
-        <View className="items-center mb-6">
-          <View className={`px-6 py-2 rounded-full ${getStateColor(offer.state)}`}>
-            <Text className="text-lg font-bold text-white">
-              {getStateText(offer.state)}
+        <View 
+          className="p-3 mb-6 rounded-xl"
+          style={{ backgroundColor: stateConfig.bgColor }}
+        >
+          <View className="flex-row items-center justify-center">
+            <Ionicons name={stateConfig.icon} size={20} color={stateConfig.color} />
+            <Text className="ml-2 text-sm font-semibold" style={{ color: stateConfig.color }}>
+              {stateConfig.text}
             </Text>
           </View>
         </View>
 
-        {/* Case Info */}
-        <View className="p-4 mb-4 bg-white border border-gray-200 rounded-xl">
-          <Text className="mb-2 text-sm text-gray-500">Caso Relacionado</Text>
+        {/* Case Name */}
+        <View className="p-5 mb-4 bg-white rounded-xl">
+          <Text className="mb-1 text-xs font-medium tracking-wide text-gray-500 uppercase">
+            Caso
+          </Text>
           <Text className="text-lg font-bold text-gray-900">
             {offer.case_name}
           </Text>
         </View>
 
-        {/* Lawyer & Price */}
-        <View className="p-5 mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl">
-          <Text className="mb-1 text-sm text-indigo-100">Abogado</Text>
-          <Text className="mb-4 text-2xl font-bold text-white">
+        {/* Lawyer Name */}
+        <View className="p-5 mb-4 bg-white rounded-xl">
+          <View className="flex-row items-center mb-1">
+            <Ionicons name="person-circle-outline" size={16} color="#6B7280" />
+            <Text className="ml-2 text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Abogado
+            </Text>
+          </View>
+          <Text className="text-lg font-bold text-gray-900">
             {offer.lawyer_name}
           </Text>
-          
-          <View className="pt-4 border-t border-indigo-400">
-            <Text className="mb-1 text-sm text-indigo-100">Honorarios Propuestos</Text>
-            <Text className="text-3xl font-bold text-white">
+        </View>
+
+        {/* Price */}
+        <View className="p-5 mb-4 bg-white rounded-xl">
+          <Text className="mb-1 text-xs font-medium tracking-wide text-gray-500 uppercase">
+            Honorarios
+          </Text>
+          <View className="flex-row items-baseline">
+            <Text className="text-3xl font-bold text-gray-900">
               ${offer.price.toLocaleString()}
+            </Text>
+            <Text className="ml-2 text-base font-medium text-gray-600">
+              DOP
             </Text>
           </View>
         </View>
 
         {/* Message */}
-        <View className="p-4 mb-4 bg-white border border-gray-200 rounded-xl">
-          <Text className="mb-3 text-lg font-bold text-gray-900">
-            Mensaje del Abogado
-          </Text>
+        <View className="p-5 mb-6 bg-white rounded-xl">
+          <View className="flex-row items-center mb-3">
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6B7280" />
+            <Text className="ml-2 text-xs font-medium tracking-wide text-gray-500 uppercase">
+              Mensaje
+            </Text>
+          </View>
           <Text className="text-base leading-6 text-gray-700">
             {offer.message || 'Sin mensaje'}
           </Text>
         </View>
 
-        {/* Lawyer Information Section */}
-        <View className="mb-6">
-          {renderLawyerInfo()}
-        </View>
-
-        {/* Accept Button (only for pending offers) */}
-        {offer.state === 'sent' && (
+        {/* Lawyer Profile Button */}
+        {offer.state === 'accepted' && (
           <TouchableOpacity
-            className="flex-row items-center justify-center px-6 py-4 bg-green-500 shadow-lg rounded-xl"
-            onPress={handleAcceptOffer}
+            className="flex-row items-center justify-between p-4 mb-4 bg-indigo-600 rounded-xl"
+            onPress={() =>
+              router.push({
+                pathname: '/client/lawyers/[caseId]',
+                params: { caseId: offer.case_id },
+              })
+            }
             activeOpacity={0.8}
           >
-            <Ionicons name="checkmark-circle" size={24} color="white" />
-            <Text className="ml-3 text-lg font-bold text-white">
-              Aceptar Oferta
-            </Text>
+            <View className="flex-row items-center">
+              <Ionicons name="person" size={20} color="white" />
+              <Text className="ml-3 text-base font-semibold text-white">
+                Ver Perfil del Abogado
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="white" />
           </TouchableOpacity>
         )}
 
-        {/* Additional Info for Accepted Offers */}
-        {offer.state === 'accepted' && (
-          <View className="p-4 border border-green-200 rounded-lg bg-green-50">
-            <View className="flex-row items-center">
-              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-              <Text className="flex-1 ml-3 text-sm text-green-800">
-                Has aceptado esta oferta. El caso está ahora en progreso con este abogado.
+        {/* Locked Message */}
+        {offer.state === 'sent' && (
+          <View 
+            className="p-4 mb-4 bg-amber-50 rounded-xl"
+            style={{ borderWidth: 1, borderColor: '#FCD34D' }}
+          >
+            <View className="flex-row items-start">
+              <Ionicons name="lock-closed" size={20} color="#F59E0B" />
+              <Text className="flex-1 ml-3 text-sm font-medium text-amber-900">
+                Acepta la oferta para ver el perfil del abogado
               </Text>
             </View>
           </View>
         )}
 
-        {/* Additional Info for Rejected Offers */}
+        {/* Accept Button */}
+        {offer.state === 'sent' && (
+          <TouchableOpacity
+            className="flex-row items-center justify-center p-4 mb-4 bg-green-600 rounded-xl"
+            onPress={handleAcceptOffer}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark-circle" size={20} color="white" />
+            <Text className="ml-2 text-base font-semibold text-white">
+              Aceptar Oferta
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Status Messages */}
+        {offer.state === 'accepted' && (
+          <View 
+            className="p-4 bg-green-50 rounded-xl"
+            style={{ borderWidth: 1, borderColor: '#6EE7B7' }}
+          >
+            <View className="flex-row items-start">
+              <Ionicons name="checkmark-circle" size={20} color="#059669" />
+              <Text className="flex-1 ml-3 text-sm font-medium text-green-900">
+                Has aceptado esta oferta. El caso está en progreso con este abogado.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {offer.state === 'rejected' && (
-          <View className="p-4 border border-red-200 rounded-lg bg-red-50">
-            <View className="flex-row items-center">
-              <Ionicons name="close-circle" size={24} color="#EF4444" />
-              <Text className="flex-1 ml-3 text-sm text-red-800">
+          <View 
+            className="p-4 bg-red-50 rounded-xl"
+            style={{ borderWidth: 1, borderColor: '#FCA5A5' }}
+          >
+            <View className="flex-row items-start">
+              <Ionicons name="close-circle" size={20} color="#DC2626" />
+              <Text className="flex-1 ml-3 text-sm font-medium text-red-900">
                 Esta oferta fue rechazada cuando aceptaste otra oferta.
               </Text>
             </View>

@@ -79,7 +79,6 @@ export default function OffersScreen() {
                     {
                       text: 'OK',
                       onPress: () => {
-                        // Redirigir al caso o refrescar
                         router.back();
                       },
                     },
@@ -102,101 +101,170 @@ export default function OffersScreen() {
     router.push(`/client/offers/detail/${offerId}`);
   };
 
-  const getStateColor = (state: string) => {
+  const getStateConfig = (state: string) => {
     switch (state) {
       case 'accepted':
-        return 'bg-green-100 text-green-800';
+        return {
+          bgColor: '#ECFDF5',
+          textColor: '#065F46',
+          borderColor: '#6EE7B7',
+          icon: 'checkmark-circle' as const,
+          text: 'Aceptada',
+        };
       case 'rejected':
-        return 'bg-red-100 text-red-800';
+        return {
+          bgColor: '#FEF2F2',
+          textColor: '#991B1B',
+          borderColor: '#FCA5A5',
+          icon: 'close-circle' as const,
+          text: 'Rechazada',
+        };
       default:
-        return 'bg-yellow-100 text-yellow-800';
+        return {
+          bgColor: '#FFFBEB',
+          textColor: '#92400E',
+          borderColor: '#FCD34D',
+          icon: 'time' as const,
+          text: 'Pendiente',
+        };
     }
   };
 
-  const getStateText = (state: string) => {
-    switch (state) {
-      case 'accepted':
-        return 'Aceptada';
-      case 'rejected':
-        return 'Rechazada';
-      default:
-        return 'Pendiente';
-    }
-  };
-
-  const renderOffer = (offer: Offer) => (
-    <View
-      key={offer.id}
-      className="p-4 mb-4 bg-white border border-gray-200 shadow-sm rounded-xl"
-    >
-      {/* Header */}
-      <View className="flex-row items-start justify-between mb-3">
-        <View className="flex-1">
-          <Text className="text-lg font-bold text-gray-900">
-            {offer.lawyer_name}
-          </Text>
-          <View className={`mt-2 px-3 py-1 rounded-full self-start ${getStateColor(offer.state)}`}>
-            <Text className="text-xs font-semibold">
-              {getStateText(offer.state)}
+  const renderOffer = (offer: Offer) => {
+    const stateConfig = getStateConfig(offer.state);
+    
+    return (
+      <View
+        key={offer.id}
+        className="p-5 mb-4 bg-white rounded-2xl"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          elevation: 3,
+        }}
+      >
+        {/* Header */}
+        <View className="flex-row items-start justify-between mb-4">
+          <View className="flex-1 pr-3">
+            <View className="flex-row items-center mb-2">
+              <View className="items-center justify-center w-10 h-10 mr-3 bg-indigo-100 rounded-xl">
+                <Ionicons name="person" size={20} color="#4F46E5" />
+              </View>
+              <Text className="flex-1 text-lg font-bold text-gray-900">
+                {offer.lawyer_name}
+              </Text>
+            </View>
+            
+            <View 
+              className="self-start px-3 py-2 rounded-xl"
+              style={{ 
+                backgroundColor: stateConfig.bgColor,
+                borderWidth: 1,
+                borderColor: stateConfig.borderColor,
+              }}
+            >
+              <View className="flex-row items-center">
+                <Ionicons name={stateConfig.icon} size={14} color={stateConfig.textColor} />
+                <Text 
+                  className="ml-1 text-xs font-bold"
+                  style={{ color: stateConfig.textColor }}
+                >
+                  {stateConfig.text}
+                </Text>
+              </View>
+            </View>
+          </View>
+          
+          <View className="items-end">
+            <View className="px-4 py-2 bg-indigo-600 rounded-xl">
+              <Text className="text-2xl font-bold text-white">
+                ${offer.price.toLocaleString()}
+              </Text>
+            </View>
+            <Text className="mt-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+              Honorarios
             </Text>
           </View>
         </View>
-        
-        <View className="items-end">
-          <Text className="text-2xl font-bold text-indigo-600">
-            ${offer.price.toLocaleString()}
+
+        {/* Message Preview */}
+        <View 
+          className="p-4 mb-4 bg-gray-50 rounded-xl"
+          style={{ borderWidth: 1, borderColor: '#F3F4F6' }}
+        >
+          <View className="flex-row items-center mb-2">
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6B7280" />
+            <Text className="ml-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+              Mensaje
+            </Text>
+          </View>
+          <Text className="text-sm leading-5 text-gray-700" numberOfLines={3}>
+            {offer.message || 'Sin mensaje'}
           </Text>
-          <Text className="text-xs text-gray-500">Honorarios</Text>
+        </View>
+
+        {/* Actions */}
+        <View className="flex-row gap-3">
+          {/* Ver detalle */}
+          <TouchableOpacity
+            className="flex-row items-center justify-center flex-1 px-4 py-3 bg-indigo-100 rounded-xl"
+            onPress={() => handleViewOffer(offer.id)}
+            activeOpacity={0.8}
+          >
+            <View className="items-center justify-center w-6 h-6 mr-2 bg-indigo-200 rounded-lg">
+              <Ionicons name="eye" size={16} color="#4F46E5" />
+            </View>
+            <Text className="font-bold text-indigo-700">
+              Ver Detalle
+            </Text> 
+          </TouchableOpacity>
+
+          {/* Aceptar oferta */}
+          {offer.state === 'sent' && (
+            <TouchableOpacity
+              className="flex-row items-center justify-center flex-1 px-4 py-3 bg-green-500 rounded-xl"
+              onPress={() => handleAcceptOffer(offer.id)}
+              activeOpacity={0.85}
+              style={{
+                shadowColor: '#10B981',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.3,
+                shadowRadius: 6,
+                elevation: 4,
+              }}
+            >
+              <View className="items-center justify-center w-6 h-6 mr-2 bg-green-400 rounded-lg">
+                <Ionicons name="checkmark" size={16} color="white" />
+              </View>
+              <Text className="font-bold text-white">
+                Aceptar
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-
-      {/* Message Preview */}
-      <View className="p-3 mb-3 rounded-lg bg-gray-50">
-        <Text className="text-sm text-gray-700" numberOfLines={3}>
-          {offer.message || 'Sin mensaje'}
-        </Text>
-      </View>
-
-      {/* Actions */}
-<View className="flex-row gap-2">
-  {/* Ver detalle */}
-  <TouchableOpacity
-    className="flex-row items-center justify-center flex-1 px-4 py-3 bg-indigo-100 rounded-lg"
-    onPress={() => handleViewOffer(offer.id)}
-  >
-    <Ionicons name="eye-outline" size={20} color="#4F46E5" />
-    <Text className="ml-2 font-semibold text-indigo-600">
-      Ver Detalle
-    </Text> 
-  </TouchableOpacity>
-
-  {/* Aceptar oferta */}
-  {offer.state === 'sent' && (
-    <TouchableOpacity
-      className="flex-row items-center justify-center flex-1 px-4 py-3 bg-green-600 rounded-lg"
-      onPress={() => handleAcceptOffer(offer.id)}
-    >
-      <Ionicons
-        name="checkmark-circle-outline"
-        size={20}
-        color="white"
-      />
-      <Text className="ml-2 font-semibold text-white">
-        Aceptar
-      </Text>
-    </TouchableOpacity>
-  )}
-</View>
-
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50">
         <View className="items-center justify-center flex-1">
-          <ActivityIndicator size="large" color="#4F46E5" />
-          <Text className="mt-4 text-gray-600">Cargando ofertas...</Text>
+          <View 
+            className="items-center justify-center w-20 h-20 bg-white rounded-3xl"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            <ActivityIndicator size="large" color="#4F46E5" />
+          </View>
+          <Text className="mt-6 text-base font-semibold text-gray-700">Cargando ofertas...</Text>
         </View>
       </SafeAreaView>
     );
@@ -205,67 +273,132 @@ export default function OffersScreen() {
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="p-2 -ml-2"
-        >
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-900">
-          Ofertas Recibidas
-        </Text>
-        <View className="w-8" />
+      <View className="bg-white border-b border-gray-100">
+        <View className="flex-row items-center justify-between px-6 py-4">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="items-center justify-center w-10 h-10 bg-gray-100 rounded-xl"
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color="#111827" />
+          </TouchableOpacity>
+          <Text className="text-xl font-bold text-gray-900">
+            Ofertas Recibidas
+          </Text>
+          <View className="w-10" />
+        </View>
       </View>
 
       <ScrollView
-        className="flex-1 px-6"
-        contentContainerStyle={{ paddingVertical: 16 }}
+        className="flex-1 px-5"
+        contentContainerStyle={{ paddingVertical: 20 }}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
             colors={['#4F46E5']}
+            tintColor="#4F46E5"
           />
         }
       >
         {error ? (
           <View className="items-center justify-center py-12">
-            <Ionicons name="alert-circle" size={48} color="#EF4444" />
-            <Text className="mt-4 text-center text-gray-600">{error}</Text>
-            <TouchableOpacity
-              className="px-6 py-3 mt-4 bg-indigo-600 rounded-lg"
-              onPress={fetchOffers}
+            <View 
+              className="items-center p-8 bg-white rounded-3xl"
+              style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 12,
+                elevation: 4,
+              }}
             >
-              <Text className="font-semibold text-white">Reintentar</Text>
-            </TouchableOpacity>
+              <View className="items-center justify-center w-16 h-16 bg-red-100 rounded-2xl">
+                <Ionicons name="alert-circle" size={36} color="#EF4444" />
+              </View>
+              <Text className="mt-4 text-lg font-bold text-gray-900">Error</Text>
+              <Text className="mt-2 text-center text-gray-600">{error}</Text>
+              <TouchableOpacity
+                className="px-6 py-3 mt-6 bg-indigo-600 rounded-xl"
+                onPress={fetchOffers}
+                activeOpacity={0.8}
+              >
+                <Text className="font-bold text-white">Reintentar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : offers.length === 0 ? (
           <View className="items-center justify-center py-12">
-            <Ionicons name="document-text-outline" size={64} color="#9CA3AF" />
-            <Text className="mt-4 text-xl font-semibold text-gray-900">
-              Sin Ofertas
-            </Text>
-            <Text className="mt-2 text-center text-gray-600">
-              Aún no has recibido ofertas para este caso
-            </Text>
+            <View 
+              className="items-center p-8 bg-white rounded-3xl"
+              style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.06,
+                shadowRadius: 12,
+                elevation: 3,
+              }}
+            >
+              <View className="items-center justify-center w-20 h-20 bg-gray-100 rounded-2xl">
+                <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
+              </View>
+              <Text className="mt-6 text-2xl font-bold text-gray-900">
+                Sin Ofertas
+              </Text>
+              <Text className="mt-3 text-base leading-6 text-center text-gray-600">
+                Aún no has recibido ofertas para este caso
+              </Text>
+            </View>
           </View>
         ) : (
           <>
             {/* Summary */}
-            <View className="p-4 mb-4 bg-white rounded-xl">
-              <Text className="text-sm text-gray-600">
-                Total de ofertas: <Text className="font-bold">{offers.length}</Text>
-              </Text>
-              <Text className="mt-1 text-sm text-gray-600">
-                Pendientes: <Text className="font-bold text-yellow-600">
-                  {offers.filter(o => o.state === 'sent').length}
-                </Text>
-              </Text>
+            <View 
+              className="p-5 mb-5 bg-white rounded-2xl"
+              style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 6,
+                elevation: 2,
+              }}
+            >
+              <View className="flex-row items-center mb-3">
+                <View className="items-center justify-center w-10 h-10 mr-3 bg-indigo-100 rounded-xl">
+                  <Ionicons name="stats-chart" size={20} color="#4F46E5" />
+                </View>
+                <Text className="text-lg font-bold text-gray-900">Resumen</Text>
+              </View>
+              
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
+                  <Text className="text-sm font-medium text-gray-500">
+                    Total de ofertas
+                  </Text>
+                  <Text className="text-2xl font-bold text-gray-900">
+                    {offers.length}
+                  </Text>
+                </View>
+                
+                <View className="w-px h-12 bg-gray-200" />
+                
+                <View className="flex-1 pl-4">
+                  <Text className="text-sm font-medium text-gray-500">
+                    Pendientes
+                  </Text>
+                  <Text className="text-2xl font-bold text-yellow-600">
+                    {offers.filter(o => o.state === 'sent').length}
+                  </Text>
+                </View>
+              </View>
             </View>
 
             {/* Offers List */}
             {offers.map(renderOffer)}
+            
+            {/* Bottom spacing */}
+            <View className="h-6" />
           </>
         )}
       </ScrollView>

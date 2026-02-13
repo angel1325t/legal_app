@@ -3,7 +3,7 @@
 import axios from 'axios';
 
 // 🔧 CONFIGURACIÓN: Cambia esto por la URL de tu backend Odoo
-const API_BASE_URL = 'http://192.168.0.4:8069';  // Ejemplo: http://192.168.0.7
+const API_BASE_URL = 'http://192.168.68.53:8069';  // Ejemplo: http://192.168.0.7
 
 const api = axios.create({
   baseURL: API_BASE_URL,
