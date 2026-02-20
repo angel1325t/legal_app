@@ -1,0 +1,10 @@
+  --non-interactive is not supported, use $CI=1 instead
+Starting project at C:\Users\Angel Perez\Desktop\Abogado\react-projects\legalApp
+React Compiler enabled
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  react-native-safe-area-context@5.4.0 - expected version: ~5.6.0
+  react-native-webview@13.16.0 - expected version: 13.15.0
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.

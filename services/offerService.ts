@@ -4,16 +4,20 @@ import api from './api';
 
 export interface Offer {
   id: number;
+  case_id: number;
+  case_name: string;
   lawyer_id: number;
   lawyer_name: string;
   price: number;
   message: string;
-  state: 'sent' | 'accepted' | 'rejected';
+  state: 'sent' | 'accepted' | 'rejected' | 'cancelled';
+  created_at: string | null;
+  viewed_at: string | null;
+  is_favorite: boolean;
 }
 
 export interface OfferDetail extends Offer {
-  case_id: number;
-  case_name: string;
+  // Reuse all Offer fields
 }
 
 export interface CaseLawyer {
@@ -128,6 +132,84 @@ class OffersService {
       return {
         success: false,
         error: error.response?.data?.error || 'Error de conexión al aceptar la oferta',
+      };
+    }
+  }
+
+  async setOfferViewed(offerId: number, isViewed: boolean): Promise<ApiResponse<OfferDetail>> {
+    try {
+      const response = await api.post(`/api/client/offers/${offerId}/viewed`, {
+        is_viewed: isViewed,
+      });
+
+      if (response.data.success) {
+        return {
+          success: true,
+          data: response.data.offer,
+          message: response.data.message || 'Estado de visto actualizado',
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data.error || 'Error al actualizar visto/no visto',
+      };
+    } catch (error: any) {
+      console.error('Error setting viewed state:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Error de conexión al actualizar visto/no visto',
+      };
+    }
+  }
+
+  async setOfferFavorite(offerId: number, isFavorite: boolean): Promise<ApiResponse<OfferDetail>> {
+    try {
+      const response = await api.post(`/api/client/offers/${offerId}/favorite`, {
+        is_favorite: isFavorite,
+      });
+
+      if (response.data.success) {
+        return {
+          success: true,
+          data: response.data.offer,
+          message: response.data.message || 'Favorito actualizado',
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data.error || 'Error al actualizar favorito',
+      };
+    } catch (error: any) {
+      console.error('Error setting favorite state:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Error de conexión al actualizar favorito',
+      };
+    }
+  }
+
+  async listFavoriteOffers(): Promise<ApiResponse<Offer[]>> {
+    try {
+      const response = await api.get('/api/client/offers/favorites');
+
+      if (response.data.success) {
+        return {
+          success: true,
+          data: response.data.offers,
+        };
+      }
+
+      return {
+        success: false,
+        error: response.data.error || 'Error al obtener favoritos',
+      };
+    } catch (error: any) {
+      console.error('Error fetching favorite offers:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Error de conexión al obtener favoritos',
       };
     }
   }

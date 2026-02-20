@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,27 +6,26 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import PagerView, { PagerViewOnPageSelectedEvent } from 'react-native-pager-view';
 import offersService, { Offer } from '../../../services/offerService';
 
 export default function OffersScreen() {
   const router = useRouter();
   const { caseId } = useLocalSearchParams();
-  
+  const viewedRequestIds = useRef<Set<number>>(new Set());
+
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [sortOption, setSortOption] = useState<'date_desc' | 'price_asc' | 'price_desc'>('date_desc');
+  const [currentPage, setCurrentPage] = useState(0);
+  const [updatingFavoriteId, setUpdatingFavoriteId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchOffers();
-  }, [caseId]);
-
-  const fetchOffers = async () => {
+  const fetchOffers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -35,6 +34,8 @@ export default function OffersScreen() {
       
       if (response.success && response.data) {
         setOffers(response.data);
+        setCurrentPage(0);
+        viewedRequestIds.current.clear();
       } else {
         setError(response.error || 'No se pudieron cargar las ofertas');
       }
@@ -43,14 +44,12 @@ export default function OffersScreen() {
       console.error(err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [caseId]);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
+  useEffect(() => {
     fetchOffers();
-  };
+  }, [fetchOffers]);
 
   const handleAcceptOffer = async (offerId: number) => {
     Alert.alert(
@@ -99,6 +98,109 @@ export default function OffersScreen() {
 
   const handleViewOffer = (offerId: number) => {
     router.push(`/client/offers/detail/${offerId}`);
+  };
+
+  const handleToggleFavorite = async (offer: Offer) => {
+    try {
+      setUpdatingFavoriteId(offer.id);
+      const response = await offersService.setOfferFavorite(offer.id, !offer.is_favorite);
+      if (!response.success || !response.data) {
+        Alert.alert('Error', response.error || 'No se pudo actualizar favorito');
+        return;
+      }
+
+      setOffers((current) =>
+        current.map((item) => (item.id === offer.id ? { ...item, ...response.data } : item))
+      );
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo actualizar favorito');
+      console.error(err);
+    } finally {
+      setUpdatingFavoriteId(null);
+    }
+  };
+
+  const sortedOffers = useMemo(() => {
+    const items = [...offers];
+    if (sortOption === 'price_asc') {
+      items.sort((a, b) => a.price - b.price);
+      return items;
+    }
+    if (sortOption === 'price_desc') {
+      items.sort((a, b) => b.price - a.price);
+      return items;
+    }
+
+    items.sort((a, b) => {
+      const left = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const right = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return right - left;
+    });
+    return items;
+  }, [offers, sortOption]);
+
+  const pagedOffers = useMemo(() => {
+    const pageSize = 4;
+    const pages: Offer[][] = [];
+    for (let i = 0; i < sortedOffers.length; i += pageSize) {
+      pages.push(sortedOffers.slice(i, i + pageSize));
+    }
+    return pages;
+  }, [sortedOffers]);
+
+  const markPageAsViewed = useCallback(async (pageOffers: Offer[]) => {
+    const toMark = pageOffers.filter(
+      (offer) => !offer.viewed_at && !viewedRequestIds.current.has(offer.id)
+    );
+    if (toMark.length === 0) return;
+
+    toMark.forEach((offer) => viewedRequestIds.current.add(offer.id));
+    const responses = await Promise.all(
+      toMark.map(async (offer) => {
+        const response = await offersService.setOfferViewed(offer.id, true);
+        return { id: offer.id, response };
+      })
+    );
+
+    setOffers((current) => {
+      let next = current;
+      responses.forEach(({ id, response }) => {
+        if (response.success && response.data) {
+          next = next.map((item) => (item.id === id ? { ...item, ...response.data } : item));
+          return;
+        }
+        viewedRequestIds.current.delete(id);
+      });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (pagedOffers.length === 0) return;
+    const safePage = Math.min(currentPage, pagedOffers.length - 1);
+    if (safePage !== currentPage) {
+      setCurrentPage(safePage);
+      return;
+    }
+
+    markPageAsViewed(pagedOffers[safePage]);
+  }, [currentPage, markPageAsViewed, pagedOffers]);
+
+  const handlePageSelected = (event: PagerViewOnPageSelectedEvent) => {
+    const page = event.nativeEvent.position || 0;
+    setCurrentPage(page);
+    const pageOffers = pagedOffers[page];
+    if (!pageOffers) return;
+    markPageAsViewed(pageOffers);
+  };
+
+  const formatDate = (isoDate: string | null) => {
+    if (!isoDate) return 'Sin fecha';
+    return new Date(isoDate).toLocaleDateString('es-DO', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   };
 
   const getStateConfig = (state: string) => {
@@ -175,6 +277,9 @@ export default function OffersScreen() {
                 </Text>
               </View>
             </View>
+            <Text className="mt-2 text-xs text-gray-500">
+              Fecha: {formatDate(offer.created_at)}
+            </Text>
           </View>
           
           <View className="items-end">
@@ -203,6 +308,47 @@ export default function OffersScreen() {
           <Text className="text-sm leading-5 text-gray-700" numberOfLines={3}>
             {offer.message || 'Sin mensaje'}
           </Text>
+        </View>
+
+        {/* Client Flags */}
+        <View className="flex-row mb-4">
+          <View
+            className={`px-3 py-1 mr-2 rounded-lg ${
+              offer.viewed_at ? 'bg-green-100' : 'bg-amber-100'
+            }`}
+          >
+            <Text className={`text-xs font-semibold ${offer.viewed_at ? 'text-green-700' : 'text-amber-700'}`}>
+              {offer.viewed_at ? 'Visto' : 'No visto'}
+            </Text>
+          </View>
+          <View
+            className={`px-3 py-1 rounded-lg ${offer.is_favorite ? 'bg-pink-100' : 'bg-gray-100'}`}
+          >
+            <Text className={`text-xs font-semibold ${offer.is_favorite ? 'text-pink-700' : 'text-gray-600'}`}>
+              {offer.is_favorite ? 'Favorito' : 'Sin favorito'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Favorite Toggle */}
+        <View className="mb-3">
+          <TouchableOpacity
+            className={`flex-row items-center justify-center px-4 py-3 rounded-xl ${
+              offer.is_favorite ? 'bg-pink-100' : 'bg-rose-100'
+            }`}
+            onPress={() => handleToggleFavorite(offer)}
+            activeOpacity={0.8}
+            disabled={updatingFavoriteId === offer.id}
+          >
+            <Ionicons
+              name={offer.is_favorite ? 'heart-dislike-outline' : 'heart-outline'}
+              size={16}
+              color={offer.is_favorite ? '#BE185D' : '#9F1239'}
+            />
+            <Text className={`ml-2 font-semibold ${offer.is_favorite ? 'text-pink-700' : 'text-rose-700'}`}>
+              {offer.is_favorite ? 'Quitar favorito' : 'Agregar favorito'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Actions */}
@@ -285,123 +431,138 @@ export default function OffersScreen() {
           <Text className="text-xl font-bold text-gray-900">
             Ofertas Recibidas
           </Text>
-          <View className="w-10" />
+          <TouchableOpacity
+            onPress={() => router.push('/client/offers/favorites')}
+            className="items-center justify-center w-10 h-10 bg-pink-100 rounded-xl"
+            activeOpacity={0.7}
+          >
+            <Ionicons name="heart" size={20} color="#BE185D" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingVertical: 20 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={['#4F46E5']}
-            tintColor="#4F46E5"
-          />
-        }
-      >
-        {error ? (
-          <View className="items-center justify-center py-12">
-            <View 
-              className="items-center p-8 bg-white rounded-3xl"
-              style={{
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 12,
-                elevation: 4,
-              }}
-            >
-              <View className="items-center justify-center w-16 h-16 bg-red-100 rounded-2xl">
-                <Ionicons name="alert-circle" size={36} color="#EF4444" />
-              </View>
-              <Text className="mt-4 text-lg font-bold text-gray-900">Error</Text>
-              <Text className="mt-2 text-center text-gray-600">{error}</Text>
-              <TouchableOpacity
-                className="px-6 py-3 mt-6 bg-indigo-600 rounded-xl"
-                onPress={fetchOffers}
-                activeOpacity={0.8}
-              >
-                <Text className="font-bold text-white">Reintentar</Text>
-              </TouchableOpacity>
+      {error ? (
+        <View className="items-center justify-center flex-1 px-5">
+          <View 
+            className="items-center p-8 bg-white rounded-3xl"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.08,
+              shadowRadius: 12,
+              elevation: 4,
+            }}
+          >
+            <View className="items-center justify-center w-16 h-16 bg-red-100 rounded-2xl">
+              <Ionicons name="alert-circle" size={36} color="#EF4444" />
             </View>
-          </View>
-        ) : offers.length === 0 ? (
-          <View className="items-center justify-center py-12">
-            <View 
-              className="items-center p-8 bg-white rounded-3xl"
-              style={{
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 12,
-                elevation: 3,
-              }}
+            <Text className="mt-4 text-lg font-bold text-gray-900">Error</Text>
+            <Text className="mt-2 text-center text-gray-600">{error}</Text>
+            <TouchableOpacity
+              className="px-6 py-3 mt-6 bg-indigo-600 rounded-xl"
+              onPress={fetchOffers}
+              activeOpacity={0.8}
             >
-              <View className="items-center justify-center w-20 h-20 bg-gray-100 rounded-2xl">
-                <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
-              </View>
-              <Text className="mt-6 text-2xl font-bold text-gray-900">
-                Sin Ofertas
-              </Text>
-              <Text className="mt-3 text-base leading-6 text-center text-gray-600">
-                Aún no has recibido ofertas para este caso
-              </Text>
+              <Text className="font-bold text-white">Reintentar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : offers.length === 0 ? (
+        <View className="items-center justify-center flex-1 px-5">
+          <View 
+            className="items-center p-8 bg-white rounded-3xl"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 12,
+              elevation: 3,
+            }}
+          >
+            <View className="items-center justify-center w-20 h-20 bg-gray-100 rounded-2xl">
+              <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
             </View>
+            <Text className="mt-6 text-2xl font-bold text-gray-900">
+              Sin Ofertas
+            </Text>
+            <Text className="mt-3 text-base leading-6 text-center text-gray-600">
+              Aún no has recibido ofertas para este caso
+            </Text>
           </View>
-        ) : (
-          <>
-            {/* Summary */}
-            <View 
-              className="p-5 mb-5 bg-white rounded-2xl"
-              style={{
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 6,
-                elevation: 2,
-              }}
-            >
-              <View className="flex-row items-center mb-3">
-                <View className="items-center justify-center w-10 h-10 mr-3 bg-indigo-100 rounded-xl">
-                  <Ionicons name="stats-chart" size={20} color="#4F46E5" />
-                </View>
-                <Text className="text-lg font-bold text-gray-900">Resumen</Text>
+        </View>
+      ) : (
+        <View className="flex-1">
+          {/* Sort + Story Header */}
+          <View className="px-5 pt-4 pb-2">
+            <View className="p-4 mb-3 bg-white rounded-2xl">
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-sm font-semibold text-gray-700">Ordenar por</Text>
+                <TouchableOpacity onPress={fetchOffers} className="px-3 py-1 bg-gray-100 rounded-lg">
+                  <Text className="text-xs font-semibold text-gray-700">Actualizar</Text>
+                </TouchableOpacity>
               </View>
-              
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1">
-                  <Text className="text-sm font-medium text-gray-500">
-                    Total de ofertas
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  onPress={() => setSortOption('date_desc')}
+                  className={`px-3 py-2 rounded-lg ${sortOption === 'date_desc' ? 'bg-indigo-600' : 'bg-gray-100'}`}
+                >
+                  <Text className={`font-semibold ${sortOption === 'date_desc' ? 'text-white' : 'text-gray-700'}`}>
+                    Fecha
                   </Text>
-                  <Text className="text-2xl font-bold text-gray-900">
-                    {offers.length}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSortOption('price_asc')}
+                  className={`px-3 py-2 rounded-lg ${sortOption === 'price_asc' ? 'bg-indigo-600' : 'bg-gray-100'}`}
+                >
+                  <Text className={`font-semibold ${sortOption === 'price_asc' ? 'text-white' : 'text-gray-700'}`}>
+                    Monto ↑
                   </Text>
-                </View>
-                
-                <View className="w-px h-12 bg-gray-200" />
-                
-                <View className="flex-1 pl-4">
-                  <Text className="text-sm font-medium text-gray-500">
-                    Pendientes
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSortOption('price_desc')}
+                  className={`px-3 py-2 rounded-lg ${sortOption === 'price_desc' ? 'bg-indigo-600' : 'bg-gray-100'}`}
+                >
+                  <Text className={`font-semibold ${sortOption === 'price_desc' ? 'text-white' : 'text-gray-700'}`}>
+                    Monto ↓
                   </Text>
-                  <Text className="text-2xl font-bold text-yellow-600">
-                    {offers.filter(o => o.state === 'sent').length}
-                  </Text>
-                </View>
+                </TouchableOpacity>
               </View>
             </View>
 
-            {/* Offers List */}
-            {offers.map(renderOffer)}
-            
-            {/* Bottom spacing */}
-            <View className="h-6" />
-          </>
-        )}
-      </ScrollView>
+            <View className="mb-2">
+              <View className="flex-row gap-2">
+                {pagedOffers.map((_, index) => (
+                  <View
+                    key={`story-step-${index}`}
+                    className={`h-1.5 flex-1 rounded-full ${index === currentPage ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                  />
+                ))}
+              </View>
+              <Text className="mt-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                Página {currentPage + 1} de {pagedOffers.length} • 4 ofertas por slide
+              </Text>
+            </View>
+          </View>
+
+          <PagerView
+            style={{ flex: 1 }}
+            initialPage={0}
+            onPageSelected={handlePageSelected}
+          >
+            {pagedOffers.map((pageItems, pageIndex) => (
+              <View key={`offers-page-${pageIndex}`} className="flex-1 px-5">
+                <ScrollView
+                  className="flex-1"
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {pageItems.map(renderOffer)}
+                </ScrollView>
+              </View>
+            ))}
+          </PagerView>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
